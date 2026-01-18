@@ -1,0 +1,109 @@
+version: "3.8"
+
+services:
+  mariadb:
+    image: bitnami/mariadb:11.4
+    container_name: moodle_mariadb
+    restart: unless-stopped
+    environment:
+      - MARIADB_ROOT_PASSWORD=${MARIADB_ROOT_PASSWORD}
+      - MARIADB_DATABASE=${MARIADB_DATABASE}
+      - MARIADB_USER=${MARIADB_USER}
+      - MARIADB_PASSWORD=${MARIADB_PASSWORD}
+    volumes:
+      - mariadb_data:/bitnami/mariadb
+    networks:
+      - moodle_net
+
+  redis:
+    image: bitnami/redis:7.2
+    container_name: moodle_redis
+    restart: unless-stopped
+    environment:
+      - REDIS_PASSWORD=${REDIS_PASSWORD}
+      - ALLOW_EMPTY_PASSWORD=no
+    volumes:
+      - redis_data:/bitnami/redis/data
+    networks:
+      - moodle_net
+
+  moodle:
+    image: bitnami/moodle:4.4
+    container_name: moodle_app
+    restart: unless-stopped
+    depends_on:
+      - mariadb
+      - redis
+
+    environment:
+      # Branding básico
+      - MOODLE_SITE_NAME=${MOODLE_SITE_NAME}
+
+      # URL pública (domínio)
+      - MOODLE_HOST=${MOODLE_HOST}
+
+      # Admin inicial do Moodle
+      - MOODLE_USERNAME=${MOODLE_ADMIN_USER}
+      - MOODLE_PASSWORD=${MOODLE_ADMIN_PASSWORD}
+      - MOODLE_EMAIL=${MOODLE_ADMIN_EMAIL}
+
+      # Banco (MariaDB)
+      - MOODLE_DATABASE_TYPE=mariadb
+      - MOODLE_DATABASE_HOST=mariadb
+      - MOODLE_DATABASE_PORT_NUMBER=3306
+      - MOODLE_DATABASE_NAME=${MARIADB_DATABASE}
+      - MOODLE_DATABASE_USER=${MARIADB_USER}
+      - MOODLE_DATABASE_PASSWORD=${MARIADB_PASSWORD}
+
+      # Redis (cache/sessões)
+      - MOODLE_REDIS_HOST=redis
+      - MOODLE_REDIS_PORT_NUMBER=6379
+      - MOODLE_REDIS_PASSWORD=${REDIS_PASSWORD}
+
+      # Ajustes úteis para demo
+      - PHP_MEMORY_LIMIT=512M
+      - PHP_MAX_EXECUTION_TIME=300
+      - PHP_POST_MAX_SIZE=128M
+      - PHP_UPLOAD_MAX_FILESIZE=128M
+
+      # Traefik / proxy reverso
+      - MOODLE_REVERSEPROXY=true
+      - MOODLE_SSLPROXY=true
+
+    volumes:
+      - moodle_data:/bitnami/moodle
+      - moodledata_data:/bitnami/moodledata
+
+    networks:
+      - moodle_net
+      - gwan
+
+    labels:
+      - "traefik.enable=true"
+
+      # Router HTTP (web) -> redirect para HTTPS
+      - "traefik.http.routers.moodle-web.rule=Host(`${MOODLE_HOST}`)"
+      - "traefik.http.routers.moodle-web.entrypoints=web"
+      - "traefik.http.routers.moodle-web.middlewares=moodle-https-redirect"
+
+      - "traefik.http.middlewares.moodle-https-redirect.redirectscheme.scheme=https"
+
+      # Router HTTPS (websecure)
+      - "traefik.http.routers.moodle.rule=Host(`${MOODLE_HOST}`)"
+      - "traefik.http.routers.moodle.entrypoints=websecure"
+      - "traefik.http.routers.moodle.tls=true"
+
+      # Moodle expõe 8080 no container (Bitnami)
+      - "traefik.http.services.moodle.loadbalancer.server.port=8080"
+
+volumes:
+  mariadb_data:
+  redis_data:
+  moodle_data:
+  moodledata_data:
+
+networks:
+  moodle_net:
+    driver: bridge
+  gwan:
+    external: true
