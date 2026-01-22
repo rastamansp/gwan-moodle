@@ -146,7 +146,7 @@ gwan-moodle/
 |---------|-----------|-------|-----------|
 | Moodle | `moodle_app` | 80 (interno) | Interface web (via Traefik) |
 | PostgreSQL | **Externo** | Configurável | Banco de dados compartilhado (via `POSTGRES_HOST`) |
-| Redis | `moodle_redis` | 6379 | Cache e sessões |
+| Redis | `moodle_redis` | - (interno) | Cache e sessões (acessível apenas internamente) |
 | Moodle Cron | `moodle_cron` | - | Tarefas agendadas |
 | Moodle Init | `moodle_init` | - | Inicialização (clone do código) |
 
