@@ -70,6 +70,9 @@ services:
       # URL pública (domínio)
       - MOODLE_HOST=${MOODLE_HOST}
       - MOODLE_WWWROOT=https://${MOODLE_HOST}
+      # Configurações para proxy reverso (Traefik)
+      - MOODLE_REVERSEPROXY=true
+      - MOODLE_SSLPROXY=true
 
       # DB (PostgreSQL externo compartilhado)
       - MOODLE_DBTYPE=pgsql
@@ -109,6 +112,13 @@ services:
       - "traefik.http.routers.moodle-backend.tls=true"
       - "traefik.http.routers.moodle-backend.tls.certresolver=letsencrypt"
       - "traefik.http.routers.moodle-backend.service=moodle-backend"
+      - "traefik.http.routers.moodle-backend.middlewares=moodle-headers"
+      
+      # Middleware para headers corretos do proxy reverso
+      - "traefik.http.middlewares.moodle-headers.headers.customrequestheaders.X-Forwarded-Proto=https"
+      - "traefik.http.middlewares.moodle-headers.headers.customrequestheaders.X-Forwarded-Host=${MOODLE_HOST}"
+      - "traefik.http.middlewares.moodle-headers.headers.customrequestheaders.X-Forwarded-Port=443"
+      - "traefik.http.middlewares.moodle-headers.headers.customrequestheaders.X-Forwarded-Ssl=on"
       
       # Service configuration
       - "traefik.http.services.moodle-backend.loadbalancer.server.port=80"
