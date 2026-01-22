@@ -25,13 +25,32 @@ services:
     command: >
       '
       set -e;
-      if [ -f /var/www/html/version.php ]; then
-        echo "Moodle já existe no volume. Pulando clone.";
+      # Verifica se o Moodle já está instalado corretamente
+      if [ -f /var/www/html/version.php ] && [ -f /var/www/html/lib/phpminimumversionlib.php ]; then
+        echo "Moodle já existe e está completo no volume. Pulando clone.";
         exit 0;
       fi;
+      # Se o diretório existe mas está incompleto, limpa completamente
+      if [ -d /var/www/html ] && [ "$(ls -A /var/www/html 2>/dev/null)" ]; then
+        echo "Diretório existe mas está incompleto ou corrompido. Limpando completamente...";
+        rm -rf /var/www/html/.git /var/www/html/* /var/www/html/.[!.]* 2>/dev/null || true;
+        # Garante que o diretório está vazio
+        find /var/www/html -mindepth 1 -maxdepth 1 -exec rm -rf {} + 2>/dev/null || true;
+      fi;
       echo "Clonando Moodle ($${MOODLE_GIT_BRANCH})...";
+      # Clona diretamente no diretório (agora garantidamente vazio)
       git clone --depth 1 --branch "$${MOODLE_GIT_BRANCH}" "$${MOODLE_GIT_URL}" /var/www/html;
-      echo "Clone finalizado.";
+      echo "Clone finalizado. Verificando instalação...";
+      # Verifica se os arquivos essenciais foram clonados
+      if [ ! -f /var/www/html/version.php ]; then
+        echo "ERRO: version.php não encontrado após clone!";
+        exit 1;
+      fi;
+      if [ ! -f /var/www/html/lib/phpminimumversionlib.php ]; then
+        echo "ERRO: lib/phpminimumversionlib.php não encontrado após clone!";
+        exit 1;
+      fi;
+      echo "Instalação verificada com sucesso.";
       '
     restart: "no"
     networks:
