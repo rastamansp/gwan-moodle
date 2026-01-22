@@ -1,3 +1,5 @@
 !.env
 !.env.example
+!.env.local
 !.gitignore
+!.env.production

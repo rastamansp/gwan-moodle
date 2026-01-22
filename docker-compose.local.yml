@@ -1,18 +1,18 @@
 version: "3.8"
 
 services:
-  mariadb:
-    image: mariadb:10
-    container_name: moodle_mariadb_local
+  postgres:
+    image: postgres:15-alpine
+    container_name: moodle_postgres_local
     environment:
-      MYSQL_ROOT_PASSWORD: ${MARIADB_ROOT_PASSWORD}
-      MYSQL_DATABASE: ${MARIADB_DATABASE}
-      MYSQL_USER: ${MARIADB_USER}
-      MYSQL_PASSWORD: ${MARIADB_PASSWORD}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DATABASE}
+      POSTGRES_USER: ${POSTGRES_USER}
+      PGDATA: /var/lib/postgresql/data/pgdata
     volumes:
-      - mariadb_data_local:/var/lib/mysql
+      - postgres_data_local:/var/lib/postgresql/data
     ports:
-      - "3306:3306"
+      - "5432:5432"
     restart: unless-stopped
     networks:
       - moodle_net_local
@@ -34,7 +34,7 @@ services:
     image: alpine/git:2.45.2
     container_name: moodle_init_local
     depends_on:
-      - mariadb
+      - postgres
     environment:
       - MOODLE_GIT_BRANCH=${MOODLE_GIT_BRANCH:-MOODLE_404_STABLE}
       - MOODLE_GIT_URL=${MOODLE_GIT_URL:-https://github.com/moodle/moodle.git}
@@ -61,7 +61,7 @@ services:
     container_name: moodle_web_local
     depends_on:
       - moodle-init
-      - mariadb
+      - postgres
       - redis
     ports:
       - "8080:80"
@@ -71,11 +71,11 @@ services:
       - MOODLE_WWWROOT=${MOODLE_WWWROOT:-http://localhost:8080}
 
       # DB (Moodle vai pedir isso no instalador web; também serve para referência)
-      - MOODLE_DBTYPE=mysqli
-      - MOODLE_DBHOST=mariadb
-      - MOODLE_DBNAME=${MARIADB_DATABASE}
-      - MOODLE_DBUSER=${MARIADB_USER}
-      - MOODLE_DBPASS=${MARIADB_PASSWORD}
+      - MOODLE_DBTYPE=pgsql
+      - MOODLE_DBHOST=postgres
+      - MOODLE_DBNAME=${POSTGRES_DATABASE}
+      - MOODLE_DBUSER=${POSTGRES_USER}
+      - MOODLE_DBPASS=${POSTGRES_PASSWORD}
 
       # Redis (você configurará no config.php após instalar)
       - MOODLE_REDIS_HOST=redis
@@ -111,7 +111,7 @@ services:
       - moodle_net_local
 
 volumes:
-  mariadb_data_local:
+  postgres_data_local:
   redis_data_local:
   moodle_www_local:
   moodledata_local:
