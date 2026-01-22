@@ -233,6 +233,7 @@ docker exec -it moodle_app bash
 | `POSTGRES_USER` | Usuário do banco | `moodle` |
 | `POSTGRES_PASSWORD` | Senha do banco | `senha_db` |
 | `REDIS_PASSWORD` | Senha do Redis | `senha_redis` |
+| `CLEAN_MOODLEDATA` | Limpar moodledata na inicialização | `false` (use `true` para forçar nova instalação) |
 
 ## 🔄 Atualização do Moodle
 
@@ -254,6 +255,36 @@ O Moodle é clonado do repositório oficial na primeira execução. Para atualiz
    ```bash
    docker volume rm gwan-moodle_postgres_data_local
    ```
+
+### Limpar moodledata para nova instalação
+
+O volume `moodledata` contém os dados de instalação e configuração do Moodle. Por padrão, ele é preservado entre reinicializações. Para forçar uma nova instalação limpa:
+
+1. **Opção 1: Usar variável de ambiente (Recomendado)**
+   ```bash
+   # Adicione ao seu .env ou .env.production
+   CLEAN_MOODLEDATA=true
+   ```
+   Em seguida, reinicie os serviços:
+   ```bash
+   docker-compose down
+   docker-compose up -d
+   ```
+   O `moodledata` será limpo automaticamente na próxima inicialização.
+
+2. **Opção 2: Remover o volume manualmente**
+   ```bash
+   # Parar os serviços
+   docker-compose down
+   
+   # Remover o volume moodledata
+   docker volume rm gwan-moodle_moodledata
+   
+   # Reiniciar os serviços
+   docker-compose up -d
+   ```
+
+**Importante:** Limpar o `moodledata` apagará todas as configurações, arquivos enviados e dados da instalação. Use apenas se realmente precisar fazer uma instalação completamente nova.
 
 3. **Inicie novamente:**
    ```bash

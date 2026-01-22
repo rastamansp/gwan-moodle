@@ -19,42 +19,64 @@ services:
     environment:
       - MOODLE_GIT_BRANCH=${MOODLE_GIT_BRANCH:-MOODLE_404_STABLE}
       - MOODLE_GIT_URL=${MOODLE_GIT_URL:-https://github.com/moodle/moodle.git}
+      - CLEAN_MOODLEDATA=${CLEAN_MOODLEDATA:-false}
     volumes:
       - moodle_www:/var/www/html
+      - moodledata:/var/www/moodledata
     entrypoint: ["/bin/sh", "-c"]
     command: >
       "
       set -e;
-      if [ -f /var/www/html/version.php ] && [ -f /var/www/html/lib/phpminimumversionlib.php ] && [ -d /var/www/html/lib ]; then
+      NEED_CLONE=false;
+      if [ ! -f /var/www/html/version.php ] || [ ! -f /var/www/html/lib/phpminimumversionlib.php ] || [ ! -d /var/www/html/lib ]; then
+        NEED_CLONE=true;
+      fi;
+      if [ \"$${NEED_CLONE}\" = \"true\" ]; then
+        echo 'Moodle incompleto ou corrompido detectado. Limpando completamente...';
+        if [ -d /var/www/html ]; then
+          cd /var/www/html;
+          rm -rf .git 2>/dev/null || true;
+          find . -mindepth 1 -maxdepth 1 -exec rm -rf {} + 2>/dev/null || true;
+          rm -rf * .[!.]* ..?* 2>/dev/null || true;
+        fi;
+        echo 'Clonando Moodle ($${MOODLE_GIT_BRANCH:-MOODLE_404_STABLE})...';
+        TEMP_DIR=\"/tmp/moodle-$$\";
+        git clone --depth 1 --branch \"$${MOODLE_GIT_BRANCH:-MOODLE_404_STABLE}\" \"$${MOODLE_GIT_URL:-https://github.com/moodle/moodle.git}\" \"$${TEMP_DIR}\";
+        cp -r \"$${TEMP_DIR}\"/. /var/www/html/ 2>/dev/null || cp -r \"$${TEMP_DIR}\"/* /var/www/html/;
+        rm -rf \"$${TEMP_DIR}\";
+        echo 'Clone finalizado. Verificando instalação...';
+        if [ ! -f /var/www/html/version.php ]; then
+          echo 'ERRO: version.php não encontrado após clone!';
+          exit 1;
+        fi;
+        if [ ! -f /var/www/html/lib/phpminimumversionlib.php ]; then
+          echo 'ERRO: lib/phpminimumversionlib.php não encontrado após clone!';
+          exit 1;
+        fi;
+        if [ ! -d /var/www/html/lib ]; then
+          echo 'ERRO: Diretório lib/ não encontrado após clone!';
+          exit 1;
+        fi;
+        echo 'Instalação verificada com sucesso.';
+        # Se o código foi recriado, limpa o moodledata para nova instalação
+        if [ \"$${CLEAN_MOODLEDATA}\" = \"true\" ] || [ ! -f /var/www/moodledata/config.php ]; then
+          echo 'Limpando moodledata para nova instalação...';
+          if [ -d /var/www/moodledata ]; then
+            find /var/www/moodledata -mindepth 1 -delete 2>/dev/null || rm -rf /var/www/moodledata/* /var/www/moodledata/.[!.]* 2>/dev/null || true;
+          fi;
+          echo 'moodledata limpo com sucesso.';
+        fi;
+      else
         echo 'Moodle já existe e está completo no volume. Pulando clone.';
-        exit 0;
+        # Verifica se precisa limpar moodledata mesmo sem recriar código
+        if [ \"$${CLEAN_MOODLEDATA}\" = \"true\" ]; then
+          echo 'CLEAN_MOODLEDATA=true detectado. Limpando moodledata...';
+          if [ -d /var/www/moodledata ]; then
+            find /var/www/moodledata -mindepth 1 -delete 2>/dev/null || rm -rf /var/www/moodledata/* /var/www/moodledata/.[!.]* 2>/dev/null || true;
+          fi;
+          echo 'moodledata limpo com sucesso.';
+        fi;
       fi;
-      echo 'Moodle incompleto ou corrompido detectado. Limpando completamente...';
-      if [ -d /var/www/html ]; then
-        cd /var/www/html;
-        rm -rf .git 2>/dev/null || true;
-        find . -mindepth 1 -maxdepth 1 -exec rm -rf {} + 2>/dev/null || true;
-        rm -rf * .[!.]* ..?* 2>/dev/null || true;
-      fi;
-      echo 'Clonando Moodle ($${MOODLE_GIT_BRANCH:-MOODLE_404_STABLE})...';
-      TEMP_DIR=\"/tmp/moodle-$$\";
-      git clone --depth 1 --branch \"$${MOODLE_GIT_BRANCH:-MOODLE_404_STABLE}\" \"$${MOODLE_GIT_URL:-https://github.com/moodle/moodle.git}\" \"$${TEMP_DIR}\";
-      cp -r \"$${TEMP_DIR}\"/. /var/www/html/ 2>/dev/null || cp -r \"$${TEMP_DIR}\"/* /var/www/html/;
-      rm -rf \"$${TEMP_DIR}\";
-      echo 'Clone finalizado. Verificando instalação...';
-      if [ ! -f /var/www/html/version.php ]; then
-        echo 'ERRO: version.php não encontrado após clone!';
-        exit 1;
-      fi;
-      if [ ! -f /var/www/html/lib/phpminimumversionlib.php ]; then
-        echo 'ERRO: lib/phpminimumversionlib.php não encontrado após clone!';
-        exit 1;
-      fi;
-      if [ ! -d /var/www/html/lib ]; then
-        echo 'ERRO: Diretório lib/ não encontrado após clone!';
-        exit 1;
-      fi;
-      echo 'Instalação verificada com sucesso.';
       "
     restart: "no"
     networks:
